@@ -1,10 +1,10 @@
-# Claude Code Hooks - Python & R Validation
+# Claude Code Hooks - Multi-Language Validation
 
-A comprehensive post-tool-use hook for Claude Code that automatically validates Python and R code after edits, providing immediate feedback for syntax errors, type issues, linting problems, and test failures.
+A comprehensive post-tool-use hook for Claude Code that automatically validates Python, JavaScript/TypeScript, and R code after edits, providing immediate feedback for syntax errors, type issues, linting problems, and test failures.
 
 ## What This Does
 
-This hook creates a **feedback loop** that improves Claude Code's output quality by 2-3x. When Claude edits or writes Python/R files, the hook automatically:
+This hook creates a **feedback loop** that improves Claude Code's output quality by 2-3x. When Claude edits or writes code files, the hook automatically:
 
 - Validates syntax
 - Runs type checkers
@@ -21,6 +21,13 @@ This hook creates a **feedback loop** that improves Claude Code's output quality
 - **Formatting** (black) - Checks code formatting
 - **Testing** (pytest) - Automatically runs tests for test files
 
+### JavaScript/TypeScript Validation
+- **Syntax checking** (Node.js) - Catches syntax errors immediately
+- **Type checking** (tsc) - TypeScript type validation
+- **Linting** (ESLint) - Ensures code quality standards
+- **Formatting** (Prettier) - Checks code formatting
+- **Testing** (Jest/Vitest) - Automatically runs tests for test files
+
 ### R Validation
 - **Syntax checking** - Validates R syntax
 - **Linting** (lintr) - Code quality checks
@@ -33,6 +40,13 @@ This hook creates a **feedback loop** that improves Claude Code's output quality
 **Python tools:**
 ```bash
 pip install mypy flake8 black pytest
+```
+
+**JavaScript/TypeScript tools:**
+```bash
+npm install -g typescript eslint prettier jest
+# or
+yarn global add typescript eslint prettier jest
 ```
 
 **R tools:**

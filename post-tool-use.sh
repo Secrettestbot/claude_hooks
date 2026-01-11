@@ -79,6 +79,83 @@ if [[ "$EXTENSION" == "py" ]]; then
     fi
   fi
 
+# ===== JAVASCRIPT/TYPESCRIPT VALIDATION =====
+elif [[ "$EXTENSION" == "js" ]] || [[ "$EXTENSION" == "jsx" ]] || [[ "$EXTENSION" == "ts" ]] || [[ "$EXTENSION" == "tsx" ]]; then
+  FEEDBACK="=== JavaScript/TypeScript Code Validation for $FILE_PATH ===\n"
+
+  # 1. Syntax check with Node.js
+  if command -v node &> /dev/null; then
+    NODE_CHECK=$(node --check "$FILE_PATH" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      FEEDBACK+="\n❌ SYNTAX ERROR:\n$NODE_CHECK\n"
+      ERRORS_FOUND=true
+    else
+      FEEDBACK+="✓ Syntax check passed\n"
+    fi
+  fi
+
+  # 2. TypeScript type checking (for .ts/.tsx files)
+  if [[ "$EXTENSION" == "ts" ]] || [[ "$EXTENSION" == "tsx" ]]; then
+    if command -v tsc &> /dev/null; then
+      # Check if tsconfig.json exists in project
+      TSCONFIG=$(find . -name "tsconfig.json" -type f 2>/dev/null | head -1)
+      if [[ -n "$TSCONFIG" ]]; then
+        TSC_OUTPUT=$(tsc --noEmit "$FILE_PATH" 2>&1)
+        if [[ $? -ne 0 ]]; then
+          FEEDBACK+="\n⚠️  Type checking issues:\n$TSC_OUTPUT\n"
+        else
+          FEEDBACK+="✓ Type checking passed\n"
+        fi
+      fi
+    fi
+  fi
+
+  # 3. Linting with ESLint (if installed)
+  if command -v eslint &> /dev/null; then
+    ESLINT_OUTPUT=$(eslint "$FILE_PATH" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      FEEDBACK+="\n⚠️  Linting issues:\n$ESLINT_OUTPUT\n"
+    else
+      FEEDBACK+="✓ Linting passed\n"
+    fi
+  fi
+
+  # 4. Code formatting check with Prettier (if installed)
+  if command -v prettier &> /dev/null; then
+    PRETTIER_OUTPUT=$(prettier --check "$FILE_PATH" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      FEEDBACK+="\n⚠️  Formatting issues (run 'prettier --write $FILE_PATH' to fix):\n$PRETTIER_OUTPUT\n"
+    else
+      FEEDBACK+="✓ Formatting check passed\n"
+    fi
+  fi
+
+  # 5. Run tests if this is a test file
+  BASENAME=$(basename "$FILE_PATH")
+  if [[ "$BASENAME" == *.test.* ]] || [[ "$BASENAME" == *.spec.* ]]; then
+    # Try Jest first
+    if command -v jest &> /dev/null; then
+      FEEDBACK+="\n--- Running tests with Jest ---\n"
+      TEST_OUTPUT=$(jest "$FILE_PATH" --no-coverage 2>&1)
+      if [[ $? -ne 0 ]]; then
+        FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
+        ERRORS_FOUND=true
+      else
+        FEEDBACK+="✓ All tests passed\n"
+      fi
+    # Try Vitest if Jest not available
+    elif command -v vitest &> /dev/null; then
+      FEEDBACK+="\n--- Running tests with Vitest ---\n"
+      TEST_OUTPUT=$(vitest run "$FILE_PATH" 2>&1)
+      if [[ $? -ne 0 ]]; then
+        FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
+        ERRORS_FOUND=true
+      else
+        FEEDBACK+="✓ All tests passed\n"
+      fi
+    fi
+  fi
+
 # ===== R VALIDATION =====
 elif [[ "$EXTENSION" == "R" ]] || [[ "$EXTENSION" == "r" ]]; then
   FEEDBACK="=== R Code Validation for $FILE_PATH ===\n"
