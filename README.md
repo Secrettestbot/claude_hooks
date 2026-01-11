@@ -145,6 +145,75 @@ SyntaxError: expected ':'
 
 Claude receives this feedback immediately and fixes it before telling you it's done.
 
+## Configuration
+
+### Hook Modes
+
+Control which checks run using the `CLAUDE_HOOK_MODE` environment variable:
+
+**Full mode (default):**
+```bash
+export CLAUDE_HOOK_MODE="full"
+```
+- Runs all checks: syntax, type checking, linting, formatting, tests
+- Best for production-quality code
+- Higher token usage (~15-25% increase)
+
+**Syntax-only mode:**
+```bash
+export CLAUDE_HOOK_MODE="syntax-only"
+```
+- Only runs syntax checking and critical error detection
+- Skips type checking, linting, formatting, and tests
+- Minimal token usage (~5-10% increase)
+- Fastest validation
+
+**Setting permanently:**
+Add to your `~/.bashrc` or `~/.zshrc`:
+```bash
+echo 'export CLAUDE_HOOK_MODE="syntax-only"' >> ~/.bashrc
+```
+
+## Session-Start Hook
+
+The session-start hook runs when Claude Code starts and provides:
+
+- Hook configuration status
+- Git repository info and uncommitted changes
+- Available development tools (Python, Node.js, ShellCheck, R)
+- Project type detection (Python, TypeScript, Node.js, R)
+- Helpful tips and reminders
+
+### Setup Session-Start Hook
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/post-tool-use.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## Customization
 
 You can modify `post-tool-use.sh` to:

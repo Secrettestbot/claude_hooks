@@ -1,6 +1,11 @@
 #!/bin/bash
-# Post-tool-use hook for Python and R code validation
+# Post-tool-use hook for multi-language code validation
 # Provides feedback to Claude after code changes
+
+# Configuration via environment variables
+# CLAUDE_HOOK_MODE: "full" (default) or "syntax-only"
+# Example: export CLAUDE_HOOK_MODE="syntax-only"
+HOOK_MODE="${CLAUDE_HOOK_MODE:-full}"
 
 # Only run on Edit/Write operations
 if [[ "$TOOL" != "Edit" && "$TOOL" != "Write" ]]; then
@@ -34,47 +39,52 @@ if [[ "$EXTENSION" == "py" ]]; then
     FEEDBACK+="✓ Syntax check passed\n"
   fi
 
-  # 2. Type checking with mypy (if installed)
-  if command -v mypy &> /dev/null; then
-    MYPY_OUTPUT=$(mypy "$FILE_PATH" 2>&1)
-    if [[ $? -ne 0 ]]; then
-      FEEDBACK+="\n⚠️  Type checking issues:\n$MYPY_OUTPUT\n"
-    else
-      FEEDBACK+="✓ Type checking passed\n"
-    fi
-  fi
-
-  # 3. Linting with flake8 (if installed)
-  if command -v flake8 &> /dev/null; then
-    FLAKE8_OUTPUT=$(flake8 "$FILE_PATH" --max-line-length=100 2>&1)
-    if [[ $? -ne 0 ]]; then
-      FEEDBACK+="\n⚠️  Linting issues:\n$FLAKE8_OUTPUT\n"
-    else
-      FEEDBACK+="✓ Linting passed\n"
-    fi
-  fi
-
-  # 4. Code formatting check with black (if installed)
-  if command -v black &> /dev/null; then
-    BLACK_OUTPUT=$(black --check "$FILE_PATH" 2>&1)
-    if [[ $? -ne 0 ]]; then
-      FEEDBACK+="\n⚠️  Formatting issues (run 'black $FILE_PATH' to fix):\n$BLACK_OUTPUT\n"
-    else
-      FEEDBACK+="✓ Formatting check passed\n"
-    fi
-  fi
-
-  # 5. Run tests if this is a test file or if tests exist
-  DIR_PATH=$(dirname "$FILE_PATH")
-  if [[ "$FILE_PATH" == *"test_"* ]] || [[ "$FILE_PATH" == *"_test.py" ]]; then
-    if command -v pytest &> /dev/null; then
-      FEEDBACK+="\n--- Running tests ---\n"
-      TEST_OUTPUT=$(pytest "$FILE_PATH" -v 2>&1)
+  # Skip additional checks in syntax-only mode
+  if [[ "$HOOK_MODE" == "full" ]]; then
+    # 2. Type checking with mypy (if installed)
+    if command -v mypy &> /dev/null; then
+      MYPY_OUTPUT=$(mypy "$FILE_PATH" 2>&1)
       if [[ $? -ne 0 ]]; then
-        FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
-        ERRORS_FOUND=true
+        FEEDBACK+="\n⚠️  Type checking issues:\n$MYPY_OUTPUT\n"
       else
-        FEEDBACK+="✓ All tests passed\n"
+        FEEDBACK+="✓ Type checking passed\n"
+      fi
+    fi
+
+    # 3. Linting with flake8 (if installed)
+    if command -v flake8 &> /dev/null; then
+      FLAKE8_OUTPUT=$(flake8 "$FILE_PATH" --max-line-length=100 2>&1)
+      if [[ $? -ne 0 ]]; then
+        FEEDBACK+="\n⚠️  Linting issues:\n$FLAKE8_OUTPUT\n"
+      else
+        FEEDBACK+="✓ Linting passed\n"
+      fi
+    fi
+
+    # 4. Code formatting check with black (if installed)
+    if command -v black &> /dev/null; then
+      BLACK_OUTPUT=$(black --check "$FILE_PATH" 2>&1)
+      if [[ $? -ne 0 ]]; then
+        FEEDBACK+="\n⚠️  Formatting issues (run 'black $FILE_PATH' to fix):\n$BLACK_OUTPUT\n"
+      else
+        FEEDBACK+="✓ Formatting check passed\n"
+      fi
+    fi
+  fi
+
+  # 5. Run tests if this is a test file (only in full mode)
+  if [[ "$HOOK_MODE" == "full" ]]; then
+    DIR_PATH=$(dirname "$FILE_PATH")
+    if [[ "$FILE_PATH" == *"test_"* ]] || [[ "$FILE_PATH" == *"_test.py" ]]; then
+      if command -v pytest &> /dev/null; then
+        FEEDBACK+="\n--- Running tests ---\n"
+        TEST_OUTPUT=$(pytest "$FILE_PATH" -v 2>&1)
+        if [[ $? -ne 0 ]]; then
+          FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
+          ERRORS_FOUND=true
+        else
+          FEEDBACK+="✓ All tests passed\n"
+        fi
       fi
     fi
   fi
@@ -94,64 +104,69 @@ elif [[ "$EXTENSION" == "js" ]] || [[ "$EXTENSION" == "jsx" ]] || [[ "$EXTENSION
     fi
   fi
 
-  # 2. TypeScript type checking (for .ts/.tsx files)
-  if [[ "$EXTENSION" == "ts" ]] || [[ "$EXTENSION" == "tsx" ]]; then
-    if command -v tsc &> /dev/null; then
-      # Check if tsconfig.json exists in project
-      TSCONFIG=$(find . -name "tsconfig.json" -type f 2>/dev/null | head -1)
-      if [[ -n "$TSCONFIG" ]]; then
-        TSC_OUTPUT=$(tsc --noEmit "$FILE_PATH" 2>&1)
-        if [[ $? -ne 0 ]]; then
-          FEEDBACK+="\n⚠️  Type checking issues:\n$TSC_OUTPUT\n"
-        else
-          FEEDBACK+="✓ Type checking passed\n"
+  # Skip additional checks in syntax-only mode
+  if [[ "$HOOK_MODE" == "full" ]]; then
+    # 2. TypeScript type checking (for .ts/.tsx files)
+    if [[ "$EXTENSION" == "ts" ]] || [[ "$EXTENSION" == "tsx" ]]; then
+      if command -v tsc &> /dev/null; then
+        # Check if tsconfig.json exists in project
+        TSCONFIG=$(find . -name "tsconfig.json" -type f 2>/dev/null | head -1)
+        if [[ -n "$TSCONFIG" ]]; then
+          TSC_OUTPUT=$(tsc --noEmit "$FILE_PATH" 2>&1)
+          if [[ $? -ne 0 ]]; then
+            FEEDBACK+="\n⚠️  Type checking issues:\n$TSC_OUTPUT\n"
+          else
+            FEEDBACK+="✓ Type checking passed\n"
+          fi
         fi
       fi
     fi
-  fi
 
-  # 3. Linting with ESLint (if installed)
-  if command -v eslint &> /dev/null; then
-    ESLINT_OUTPUT=$(eslint "$FILE_PATH" 2>&1)
-    if [[ $? -ne 0 ]]; then
-      FEEDBACK+="\n⚠️  Linting issues:\n$ESLINT_OUTPUT\n"
-    else
-      FEEDBACK+="✓ Linting passed\n"
-    fi
-  fi
-
-  # 4. Code formatting check with Prettier (if installed)
-  if command -v prettier &> /dev/null; then
-    PRETTIER_OUTPUT=$(prettier --check "$FILE_PATH" 2>&1)
-    if [[ $? -ne 0 ]]; then
-      FEEDBACK+="\n⚠️  Formatting issues (run 'prettier --write $FILE_PATH' to fix):\n$PRETTIER_OUTPUT\n"
-    else
-      FEEDBACK+="✓ Formatting check passed\n"
-    fi
-  fi
-
-  # 5. Run tests if this is a test file
-  BASENAME=$(basename "$FILE_PATH")
-  if [[ "$BASENAME" == *.test.* ]] || [[ "$BASENAME" == *.spec.* ]]; then
-    # Try Jest first
-    if command -v jest &> /dev/null; then
-      FEEDBACK+="\n--- Running tests with Jest ---\n"
-      TEST_OUTPUT=$(jest "$FILE_PATH" --no-coverage 2>&1)
+    # 3. Linting with ESLint (if installed)
+    if command -v eslint &> /dev/null; then
+      ESLINT_OUTPUT=$(eslint "$FILE_PATH" 2>&1)
       if [[ $? -ne 0 ]]; then
-        FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
-        ERRORS_FOUND=true
+        FEEDBACK+="\n⚠️  Linting issues:\n$ESLINT_OUTPUT\n"
       else
-        FEEDBACK+="✓ All tests passed\n"
+        FEEDBACK+="✓ Linting passed\n"
       fi
-    # Try Vitest if Jest not available
-    elif command -v vitest &> /dev/null; then
-      FEEDBACK+="\n--- Running tests with Vitest ---\n"
-      TEST_OUTPUT=$(vitest run "$FILE_PATH" 2>&1)
+    fi
+
+    # 4. Code formatting check with Prettier (if installed)
+    if command -v prettier &> /dev/null; then
+      PRETTIER_OUTPUT=$(prettier --check "$FILE_PATH" 2>&1)
       if [[ $? -ne 0 ]]; then
-        FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
-        ERRORS_FOUND=true
+        FEEDBACK+="\n⚠️  Formatting issues (run 'prettier --write $FILE_PATH' to fix):\n$PRETTIER_OUTPUT\n"
       else
-        FEEDBACK+="✓ All tests passed\n"
+        FEEDBACK+="✓ Formatting check passed\n"
+      fi
+    fi
+  fi
+
+  # 5. Run tests if this is a test file (only in full mode)
+  if [[ "$HOOK_MODE" == "full" ]]; then
+    BASENAME=$(basename "$FILE_PATH")
+    if [[ "$BASENAME" == *.test.* ]] || [[ "$BASENAME" == *.spec.* ]]; then
+      # Try Jest first
+      if command -v jest &> /dev/null; then
+        FEEDBACK+="\n--- Running tests with Jest ---\n"
+        TEST_OUTPUT=$(jest "$FILE_PATH" --no-coverage 2>&1)
+        if [[ $? -ne 0 ]]; then
+          FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
+          ERRORS_FOUND=true
+        else
+          FEEDBACK+="✓ All tests passed\n"
+        fi
+      # Try Vitest if Jest not available
+      elif command -v vitest &> /dev/null; then
+        FEEDBACK+="\n--- Running tests with Vitest ---\n"
+        TEST_OUTPUT=$(vitest run "$FILE_PATH" 2>&1)
+        if [[ $? -ne 0 ]]; then
+          FEEDBACK+="\n❌ TESTS FAILED:\n$TEST_OUTPUT\n"
+          ERRORS_FOUND=true
+        else
+          FEEDBACK+="✓ All tests passed\n"
+        fi
       fi
     fi
   fi
@@ -198,23 +213,26 @@ elif [[ "$EXTENSION" == "R" ]] || [[ "$EXTENSION" == "r" ]]; then
     FEEDBACK+="✓ Syntax check passed\n"
   fi
 
-  # 2. Linting with lintr (if installed)
-  if command -v Rscript &> /dev/null; then
-    LINTR_CHECK=$(Rscript -e "if (requireNamespace('lintr', quietly=TRUE)) { lintr::lint('$FILE_PATH') } else { cat('lintr not installed') }" 2>&1)
-    if [[ "$LINTR_CHECK" != *"lintr not installed"* ]] && [[ -n "$LINTR_CHECK" ]]; then
-      FEEDBACK+="\n⚠️  Linting issues:\n$LINTR_CHECK\n"
-    elif [[ "$LINTR_CHECK" != *"lintr not installed"* ]]; then
-      FEEDBACK+="✓ Linting passed\n"
+  # Skip additional checks in syntax-only mode
+  if [[ "$HOOK_MODE" == "full" ]]; then
+    # 2. Linting with lintr (if installed)
+    if command -v Rscript &> /dev/null; then
+      LINTR_CHECK=$(Rscript -e "if (requireNamespace('lintr', quietly=TRUE)) { lintr::lint('$FILE_PATH') } else { cat('lintr not installed') }" 2>&1)
+      if [[ "$LINTR_CHECK" != *"lintr not installed"* ]] && [[ -n "$LINTR_CHECK" ]]; then
+        FEEDBACK+="\n⚠️  Linting issues:\n$LINTR_CHECK\n"
+      elif [[ "$LINTR_CHECK" != *"lintr not installed"* ]]; then
+        FEEDBACK+="✓ Linting passed\n"
+      fi
     fi
-  fi
 
-  # 3. Check for common predictive algorithm issues
-  if grep -q "library(caret)\|library(randomForest)\|library(xgboost)" "$FILE_PATH"; then
-    FEEDBACK+="✓ Predictive modeling libraries detected\n"
+    # 3. Check for common predictive algorithm issues
+    if grep -q "library(caret)\|library(randomForest)\|library(xgboost)" "$FILE_PATH"; then
+      FEEDBACK+="✓ Predictive modeling libraries detected\n"
 
-    # Check for train/test split
-    if ! grep -q "createDataPartition\|sample\|train_test_split" "$FILE_PATH"; then
-      FEEDBACK+="\n⚠️  Warning: No train/test split detected. Consider adding data partitioning.\n"
+      # Check for train/test split
+      if ! grep -q "createDataPartition\|sample\|train_test_split" "$FILE_PATH"; then
+        FEEDBACK+="\n⚠️  Warning: No train/test split detected. Consider adding data partitioning.\n"
+      fi
     fi
   fi
 
