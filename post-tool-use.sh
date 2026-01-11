@@ -156,6 +156,35 @@ elif [[ "$EXTENSION" == "js" ]] || [[ "$EXTENSION" == "jsx" ]] || [[ "$EXTENSION
     fi
   fi
 
+# ===== SHELL SCRIPT VALIDATION =====
+elif [[ "$EXTENSION" == "sh" ]] || [[ "$EXTENSION" == "bash" ]]; then
+  FEEDBACK="=== Shell Script Validation for $FILE_PATH ===\n"
+
+  # 1. Syntax check with bash -n
+  BASH_CHECK=$(bash -n "$FILE_PATH" 2>&1)
+  if [[ $? -ne 0 ]]; then
+    FEEDBACK+="\n❌ SYNTAX ERROR:\n$BASH_CHECK\n"
+    ERRORS_FOUND=true
+  else
+    FEEDBACK+="✓ Syntax check passed\n"
+  fi
+
+  # 2. ShellCheck validation (if installed)
+  if command -v shellcheck &> /dev/null; then
+    SHELLCHECK_OUTPUT=$(shellcheck "$FILE_PATH" 2>&1)
+    if [[ $? -ne 0 ]]; then
+      # Check if there are errors (not just warnings/info)
+      if echo "$SHELLCHECK_OUTPUT" | grep -q "error:"; then
+        FEEDBACK+="\n❌ SHELLCHECK ERRORS:\n$SHELLCHECK_OUTPUT\n"
+        ERRORS_FOUND=true
+      else
+        FEEDBACK+="\n⚠️  ShellCheck warnings:\n$SHELLCHECK_OUTPUT\n"
+      fi
+    else
+      FEEDBACK+="✓ ShellCheck validation passed\n"
+    fi
+  fi
+
 # ===== R VALIDATION =====
 elif [[ "$EXTENSION" == "R" ]] || [[ "$EXTENSION" == "r" ]]; then
   FEEDBACK="=== R Code Validation for $FILE_PATH ===\n"

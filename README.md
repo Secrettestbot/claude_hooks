@@ -1,6 +1,6 @@
 # Claude Code Hooks - Multi-Language Validation
 
-A comprehensive post-tool-use hook for Claude Code that automatically validates Python, JavaScript/TypeScript, and R code after edits, providing immediate feedback for syntax errors, type issues, linting problems, and test failures.
+A comprehensive post-tool-use hook for Claude Code that automatically validates Python, JavaScript/TypeScript, Shell scripts, and R code after edits, providing immediate feedback for syntax errors, type issues, linting problems, and test failures.
 
 ## What This Does
 
@@ -28,6 +28,10 @@ This hook creates a **feedback loop** that improves Claude Code's output quality
 - **Formatting** (Prettier) - Checks code formatting
 - **Testing** (Jest/Vitest) - Automatically runs tests for test files
 
+### Shell Script Validation
+- **Syntax checking** (bash -n) - Validates shell script syntax
+- **ShellCheck** - Catches common scripting errors, security issues, and best practices violations
+
 ### R Validation
 - **Syntax checking** - Validates R syntax
 - **Linting** (lintr) - Code quality checks
@@ -47,6 +51,18 @@ pip install mypy flake8 black pytest
 npm install -g typescript eslint prettier jest
 # or
 yarn global add typescript eslint prettier jest
+```
+
+**Shell script tools:**
+```bash
+# Ubuntu/Debian
+apt-get install shellcheck
+
+# macOS
+brew install shellcheck
+
+# Or download static binary (works anywhere)
+# https://github.com/koalaman/shellcheck/releases
 ```
 
 **R tools:**
@@ -103,7 +119,7 @@ The hook uses **exit codes** to communicate with Claude:
 
 ### Workflow
 
-1. Claude edits/writes a Python or R file
+1. Claude edits/writes a Python, JavaScript/TypeScript, Shell script, or R file
 2. Hook automatically runs validation checks
 3. If errors are found:
    - Hook exits with code 2
