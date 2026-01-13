@@ -1,16 +1,45 @@
-# Claude Code Hooks - Python & R Validation
+# Claude Code Hooks Collection
 
-A comprehensive post-tool-use hook for Claude Code that automatically validates Python and R code after edits, providing immediate feedback for syntax errors, type issues, linting problems, and test failures.
+A collection of useful hooks for Claude Code to improve development workflow, code quality, and safety.
 
-## What This Does
+## Available Hooks
 
-This hook creates a **feedback loop** that improves Claude Code's output quality by 2-3x. When Claude edits or writes Python/R files, the hook automatically:
+### 1. post-tool-use.sh - Python & R Validation
+
+Creates a **feedback loop** that improves Claude Code's output quality by 2-3x. When Claude edits or writes Python/R files, the hook automatically:
 
 - Validates syntax
 - Runs type checkers
 - Checks code style/linting
 - Runs tests (if applicable)
 - Provides immediate feedback to Claude so it can self-correct
+
+### 2. session-start.sh - Development Environment Info
+
+Displays useful context at the start of every Claude Code session:
+
+- Hook mode configuration
+- Git repository info (branch, uncommitted changes)
+- Available development tools (Python, Node.js, R, ShellCheck, etc.)
+- Project type detection (Python, Node.js, TypeScript, R)
+- Helpful usage tips
+
+### 3. pre-tool-use.sh - Smart Tool Execution Control
+
+Adds safety checks and auto-approves safe operations before tool execution:
+
+**Auto-approved (no prompts):**
+- Read-only tools (Read, Glob, Grep)
+- Safe bash commands (ls, pwd, git status/log/diff, version checks)
+- Package manager info commands
+
+**Automatically blocked:**
+- Destructive commands (rm -rf /, mkfs, malicious pipes)
+- Sensitive file edits (.env, credentials, keys, passwords)
+
+**Asks for confirmation:**
+- Git force push to main/master
+- System config edits (.bashrc, .zshrc, .gitconfig)
 
 ## Features
 
@@ -48,19 +77,29 @@ Rscript -e "install.packages('lintr')"
 
 ### Setup
 
-1. **Copy the hook to your Claude Code hooks directory:**
+1. **Copy the hooks to your Claude Code hooks directory:**
    ```bash
    mkdir -p ~/.claude/hooks
-   cp post-tool-use.sh ~/.claude/hooks/
-   chmod +x ~/.claude/hooks/post-tool-use.sh
+   cp *.sh ~/.claude/hooks/
+   chmod +x ~/.claude/hooks/*.sh
    ```
 
-2. **Enable the hook in your Claude Code settings:**
+2. **Enable the hooks in your Claude Code settings:**
 
    Edit `~/.claude/settings.json` and add:
    ```json
    {
      "hooks": {
+       "PreToolUse": [
+         {
+           "hooks": [
+             {
+               "type": "command",
+               "command": "~/.claude/hooks/pre-tool-use.sh"
+             }
+           ]
+         }
+       ],
        "PostToolUse": [
          {
            "hooks": [
@@ -70,12 +109,22 @@ Rscript -e "install.packages('lintr')"
              }
            ]
          }
+       ],
+       "SessionStart": [
+         {
+           "hooks": [
+             {
+               "type": "command",
+               "command": "~/.claude/hooks/session-start.sh"
+             }
+           ]
+         }
        ]
      }
    }
    ```
 
-3. **Restart Claude Code** for the hook to take effect
+3. **Restart Claude Code** for the hooks to take effect
 
 ## How It Works
 
@@ -117,12 +166,22 @@ Claude receives this feedback immediately and fixes it before telling you it's d
 
 ## Customization
 
-You can modify `post-tool-use.sh` to:
-
+### post-tool-use.sh
 - Add more validation tools
 - Adjust linting rules
 - Skip certain checks
 - Add custom project-specific validations
+
+### pre-tool-use.sh
+- Change auto-approval rules
+- Add custom blocked commands
+- Modify sensitive file patterns
+- Adjust default behavior (allow vs ask)
+
+### session-start.sh
+- Add/remove tool checks
+- Customize project type detection
+- Add custom environment checks
 
 ## Requirements
 
