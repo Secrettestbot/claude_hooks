@@ -1,0 +1,26 @@
+# Credentials and secrets
+.credentials.json
+*.pem
+*.key
+*.env
+
+# Session data
+history.jsonl
+terminal-comm/sessions/
+terminal-comm/messages/
+terminal-comm/env_export.sh
+
+# Debug and logs
+debug/
+shell-snapshots/
+
+# IDE and project data
+ide/
+projects/
+file-history/
+
+# Stats and tracking
+statsig/
+
+# Todos (session-specific)
+todos/
