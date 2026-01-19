@@ -24,3 +24,5 @@ statsig/
 
 # Todos (session-specific)
 todos/
+terminal-comm/terminals.json
+settings.local.json

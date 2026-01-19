@@ -146,6 +146,28 @@ echo ""
 if [[ -f "$HOME/.claude/hooks/terminal-comm-lib.sh" ]]; then
   source "$HOME/.claude/hooks/terminal-comm-lib.sh"
 
+  # Auto-enable communication if CLAUDE_TERMINAL_NAME is set
+  if [[ -n "$CLAUDE_TERMINAL_NAME" ]] && ! is_comm_enabled; then
+    # Enable communication automatically
+    SESSION_ID=$(get_session_id)
+    export CLAUDE_SESSION_ID="$SESSION_ID"
+
+    CONFIG_FILE="$SESSIONS_DIR/${SESSION_ID}.json"
+
+    # Create session config
+    jq -n --arg name "$CLAUDE_TERMINAL_NAME" \
+          --arg sid "$SESSION_ID" \
+          '{
+            enabled: true,
+            name: $name,
+            session_id: $sid,
+            enabled_at: (now | strftime("%Y-%m-%dT%H:%M:%SZ"))
+          }' > "$CONFIG_FILE" 2>/dev/null
+
+    # Register in the shared registry
+    register_terminal "$CLAUDE_TERMINAL_NAME" 2>/dev/null
+  fi
+
   if is_comm_enabled; then
     TERMINAL_NAME=$(get_terminal_name)
     echo "💬 Inter-Terminal Communication: ENABLED"
