@@ -1,6 +1,6 @@
 #!/bin/bash
 # Spawn multiple Claude Code terminals with communication enabled
-# Usage: spawn-terminal.sh T1 T2 T3 ...
+# Usage: spawn-terminal.sh [--workdir DIR] T1 T2 T3 ...
 
 # Source the library for directory setup
 source "$HOME/.claude/hooks/terminal-comm-lib.sh"
@@ -8,15 +8,24 @@ source "$HOME/.claude/hooks/terminal-comm-lib.sh"
 # Ensure communication directories exist
 mkdir -p "$COMM_DIR" "$SESSIONS_DIR" "$MESSAGES_DIR"
 
+# Parse optional --workdir argument
+WORK_DIR=""
+if [[ "$1" == "--workdir" ]]; then
+  WORK_DIR="$2"
+  shift 2
+fi
+
 # Check if terminal names were provided
 if [[ $# -eq 0 ]]; then
   echo "Error: No terminal names provided" >&2
-  echo "Usage: $0 <terminal1> <terminal2> ..." >&2
+  echo "Usage: $0 [--workdir DIR] <terminal1> <terminal2> ..." >&2
   exit 1
 fi
 
-# Get current working directory to pass to spawned terminals
-WORK_DIR="$(pwd)"
+# Get current working directory to pass to spawned terminals if not specified
+if [[ -z "$WORK_DIR" ]]; then
+  WORK_DIR="$(pwd)"
+fi
 
 # Detect terminal emulator
 detect_terminal() {
@@ -86,8 +95,11 @@ cd "$WORK_DIR" || exit 1
 # Set terminal name for auto-registration
 export CLAUDE_TERMINAL_NAME="$term_name"
 
-# Enable communication
-bash "$HOME/.claude/hooks/terminal-comm-enable.sh" "$term_name"
+# Enable communication - use source to export variables to current shell
+source "$HOME/.claude/hooks/terminal-comm-enable.sh" "$term_name"
+
+# Export the session ID for Claude to use
+export CLAUDE_SESSION_ID="\$PPID"
 
 # Clear the screen
 clear
@@ -101,7 +113,43 @@ echo "Terminal communication is enabled."
 echo "You can communicate with other terminals."
 echo ""
 
-# Start Claude Code
+# Check for pending messages
+source "$HOME/.claude/hooks/terminal-comm-lib.sh"
+if is_comm_enabled; then
+  MESSAGE_COUNT=\$(get_message_count)
+
+  if [[ "\$MESSAGE_COUNT" -gt 0 ]]; then
+    echo "📨 You have \$MESSAGE_COUNT pending message(s):"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    check_messages
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Press Enter to start Claude Code..."
+    read
+  fi
+fi
+
+# Start Claude Code with environment variables properly set
+# Export the session ID and terminal name for Claude to use
+export CLAUDE_SESSION_ID="\$PPID"
+export CLAUDE_TERMINAL_NAME="$term_name"
+
+# Register this terminal's TTY in the TTY mapping file for hook auto-approval
+MY_TTY=\$(tty | sed 's#/dev/##')
+TTY_MAP_FILE="\$HOME/.claude/terminal-comm/tty_map.json"
+if [[ -f "\$TTY_MAP_FILE" ]]; then
+  # Update existing mapping
+  jq --arg tty "\$MY_TTY" --arg name "$term_name" '.[\$tty] = \$name' "\$TTY_MAP_FILE" > "\${TTY_MAP_FILE}.tmp" && mv "\${TTY_MAP_FILE}.tmp" "\$TTY_MAP_FILE"
+else
+  # Create new mapping file
+  mkdir -p "\$(dirname "\$TTY_MAP_FILE")"
+  echo '{}' | jq --arg tty "\$MY_TTY" --arg name "$term_name" '.[\$tty] = \$name' > "\$TTY_MAP_FILE"
+fi
+
+# Start Claude Code directly
+# The auto-accept-trust.sh script running in background will handle the trust dialog
 exec claude
 
 # Clean up the setup script after use
@@ -119,6 +167,9 @@ EOF
         # Create a new tmux window with the terminal name
         tmux new-window -n "Claude:$term_name" "bash $setup_script; exec bash" 2>/dev/null ||
         tmux new-session -d -s "claude-$term_name" -n "$term_name" "bash $setup_script; exec bash" 2>/dev/null
+
+        # Auto-accept trust dialog by sending Enter after a short delay
+        bash "$HOME/.claude/hooks/auto-accept-trust.sh" "$term_name" &
 
         echo "  ✓ Created tmux window: $term_name"
         echo "    To attach: tmux attach -t claude-$term_name"

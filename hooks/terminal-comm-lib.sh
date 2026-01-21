@@ -17,6 +17,16 @@ get_session_id() {
     return 0
   fi
 
+  # Check for PID mapping file
+  local my_ppid="$PPID"
+  if [[ -f "$COMM_DIR/pid_map.json" ]]; then
+    local mapped_session=$(jq -r --arg ppid "$my_ppid" '.[$ppid] // empty' "$COMM_DIR/pid_map.json" 2>/dev/null)
+    if [[ -n "$mapped_session" ]]; then
+      echo "$mapped_session"
+      return 0
+    fi
+  fi
+
   # Fall back to PPID (parent process ID) as session identifier
   echo "$PPID"
 }
@@ -212,13 +222,15 @@ check_messages() {
 
   local messages=()
 
-  # Find all message files for this session
+  # Find all message files for this session or terminal name
   for msg_file in "$MESSAGES_DIR"/*.json; do
     [[ ! -f "$msg_file" ]] && continue
 
     local to_session=$(jq -r '.to_session_id // empty' "$msg_file" 2>/dev/null)
+    local to_name=$(jq -r '.to // empty' "$msg_file" 2>/dev/null)
 
-    if [[ "$to_session" == "$session_id" ]]; then
+    # Match by session ID or terminal name
+    if [[ "$to_session" == "$session_id" ]] || [[ "$to_name" == "$terminal_name" ]]; then
       messages+=("$msg_file")
     fi
   done
@@ -244,13 +256,17 @@ check_messages() {
 # Get count of pending messages
 get_message_count() {
   local session_id=$(get_session_id)
+  local terminal_name=$(get_terminal_name)
   local count=0
 
   for msg_file in "$MESSAGES_DIR"/*.json; do
     [[ ! -f "$msg_file" ]] && continue
 
     local to_session=$(jq -r '.to_session_id // empty' "$msg_file" 2>/dev/null)
-    if [[ "$to_session" == "$session_id" ]]; then
+    local to_name=$(jq -r '.to // empty' "$msg_file" 2>/dev/null)
+
+    # Match by session ID or terminal name
+    if [[ "$to_session" == "$session_id" ]] || [[ "$to_name" == "$terminal_name" ]]; then
       ((count++))
     fi
   done

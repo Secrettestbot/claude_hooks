@@ -15,13 +15,39 @@ if [[ -z "$TOOL_NAME" ]]; then
   exit 0
 fi
 
-# ===== CHECK FOR INTER-TERMINAL MESSAGES =====
-# Source communication library if it exists
+# ===== SOURCE TERMINAL COMMUNICATION LIBRARY EARLY =====
+# We need this for get_terminal_name() function
 if [[ -f "$HOME/.claude/hooks/terminal-comm-lib.sh" ]]; then
   source "$HOME/.claude/hooks/terminal-comm-lib.sh"
+fi
 
-  # Only check if communication is enabled
-  if is_comm_enabled; then
+# ===== AUTO-APPROVE FOR MINION TERMINALS =====
+# Minion terminals (T1, T2, etc.) should have minimal approval requirements
+# Get terminal name by finding the TTY (hook's parent shell inherits Claude's TTY)
+CLAUDE_TTY=$(ps -o tty= -p $PPID 2>/dev/null | tr -d ' ')
+TERMINAL_NAME=""
+if [[ -f "$HOME/.claude/terminal-comm/tty_map.json" ]] && [[ -n "$CLAUDE_TTY" ]]; then
+  TERMINAL_NAME=$(jq -r --arg tty "$CLAUDE_TTY" '.[$tty] // empty' "$HOME/.claude/terminal-comm/tty_map.json" 2>/dev/null)
+fi
+
+# Auto-approve for minion terminals (T1, T2, T3, etc.)
+if [[ "$TERMINAL_NAME" =~ ^T[0-9]+$ ]] || [[ "$CLAUDE_MINION_MODE" == "true" ]]; then
+  # Only block obviously dangerous commands, auto-approve everything else for minions
+  if [[ "$TOOL_NAME" == "Bash" ]]; then
+    COMMAND=$(echo "$TOOL_INPUT" | jq -r '.command // empty')
+    if [[ "$COMMAND" =~ (rm\ -rf\ /|mkfs|dd\ if=|:\(\)\{|curl.*\|.*sh|wget.*\|.*sh) ]]; then
+      echo "🚫 BLOCKED: Potentially destructive command detected" >&2
+      exit 2
+    fi
+  fi
+  # Auto-approve all other operations for minion terminals
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","decision":{"behavior":"allow"}}}'
+  exit 0
+fi
+
+# ===== CHECK FOR INTER-TERMINAL MESSAGES =====
+# Only check if communication is enabled (library already sourced above)
+if type is_comm_enabled &>/dev/null && is_comm_enabled; then
     MESSAGE_COUNT=$(get_message_count)
 
     if [[ "$MESSAGE_COUNT" -gt 0 ]]; then
@@ -37,7 +63,6 @@ if [[ -f "$HOME/.claude/hooks/terminal-comm-lib.sh" ]]; then
       fi
     fi
   fi
-fi
 
 # ===== AUTO-APPROVE SAFE READ-ONLY TOOLS =====
 case "$TOOL_NAME" in
@@ -54,6 +79,12 @@ if [[ "$TOOL_NAME" == "Bash" ]]; then
 
   # Auto-approve safe read-only commands
   if [[ "$COMMAND" =~ ^(ls|pwd|which|git\ status|git\ log|git\ diff|git\ branch|node\ --version|python.*--version|npm\ list) ]]; then
+    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","decision":{"behavior":"allow"}}}'
+    exit 0
+  fi
+
+  # Auto-approve pip install commands in /home/parris directory
+  if [[ "$COMMAND" =~ pip[[:space:]]+install ]] && [[ "$COMMAND" =~ /home/parris ]]; then
     echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","decision":{"behavior":"allow"}}}'
     exit 0
   fi

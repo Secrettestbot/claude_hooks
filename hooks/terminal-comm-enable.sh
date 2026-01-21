@@ -17,6 +17,7 @@ TERMINAL_NAME="$1"
 # Use PPID as session ID and store it
 SESSION_ID="$PPID"
 export CLAUDE_SESSION_ID="$SESSION_ID"
+export CLAUDE_TERMINAL_NAME="$TERMINAL_NAME"
 
 CONFIG_FILE="$SESSIONS_DIR/${SESSION_ID}.json"
 
@@ -44,4 +45,4 @@ echo ""
 # Show other active terminals
 list_terminals
 
-exit 0
+return 0
