@@ -9,6 +9,7 @@ A comprehensive collection of hooks for Claude Code that enables multi-terminal 
 - **Inter-Terminal Communication**: Enable coordination between multiple Claude instances
 - **Project Management**: Save and restore terminal configurations with working directories and context
 - **Claude-Managed Context Files**: Context files are now stored as markdown in `~/.claude/context/` and automatically loaded when projects start
+- **Slash Commands**: All hook functionality now available as slash commands (e.g., `/project-save`, `/spawn`, `/terminal-send`)
 - **Auto-Accept Trust**: Automatically handle trust dialogs for spawned terminals
 - **Enhanced Session Start**: Auto-detect project types and show comprehensive environment info
 
@@ -303,6 +304,42 @@ Example:
 2. When prompted, provide files: `README.md`, `api-docs.txt`, `task-list.md`
 3. Files are copied to `~/.claude/context/webapp/`
 4. When you start the project, each terminal receives references to its context files
+
+### Slash Commands (Alternative to Natural Language)
+
+All hook functionality is also available via slash commands in `~/.claude/commands/`:
+
+**Project Management:**
+- `/project-save <name> [description]` - Save current terminal setup as a project
+- `/project-start <name>` - Start a saved project
+- `/project-list` - List all available projects
+
+**Terminal Spawning:**
+- `/spawn <terminal1> <terminal2> ...` - Spawn multiple Claude Code terminals
+  - Example: `/spawn Frontend Backend Database`
+
+**Inter-Terminal Communication:**
+- `/terminal-enable <name>` - Enable communication for this terminal
+- `/terminal-send <to> <message>` - Send message to another terminal
+  - Example: `/terminal-send Backend Database schema is ready`
+
+**Comparison:**
+
+Natural Language:
+```
+"Claude spawn two terminals named T1 and T2"
+"Send a message to T2: Run the test suite"
+"Save this as project webapp"
+```
+
+Slash Commands:
+```
+/spawn T1 T2
+/terminal-send T2 Run the test suite
+/project-save webapp "My web application"
+```
+
+Both approaches work identically - use whichever you prefer!
 
 ## Example
 
