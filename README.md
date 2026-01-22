@@ -8,6 +8,7 @@ A comprehensive collection of hooks for Claude Code that enables multi-terminal 
 - **Terminal Spawning System**: Spawn multiple Claude Code terminals with natural language commands
 - **Inter-Terminal Communication**: Enable coordination between multiple Claude instances
 - **Project Management**: Save and restore terminal configurations with working directories and context
+- **Claude-Managed Context Files**: Context files are now stored as markdown in `~/.claude/context/` and automatically loaded when projects start
 - **Auto-Accept Trust**: Automatically handle trust dialogs for spawned terminals
 - **Enhanced Session Start**: Auto-detect project types and show comprehensive environment info
 
@@ -97,7 +98,8 @@ Save and restore multi-terminal project configurations:
 **Features:**
 - Save terminal names, working directories, and configurations
 - Auto-spawn all project terminals on load
-- Support for context files and custom system prompts per terminal
+- Support for Claude-managed context files (markdown documents stored in `~/.claude/context/`)
+- Custom system prompts per terminal
 - Natural language project management ("start project webapp")
 - JSON-based project configs in `~/.claude/projects/`
 
@@ -285,8 +287,22 @@ In Terminal T2:
 
 Projects are saved as JSON in `~/.claude/projects/` and can include:
 - Terminal names and working directories
-- Context files to auto-load
+- Context files (Claude-managed markdown documents)
 - Custom system prompts per terminal
+
+**Context File Management:**
+
+When you save a project, you can specify context files that will be copied to `~/.claude/context/<project-name>/`:
+- Files are automatically converted to `.md` format
+- Context files are loaded when the project starts
+- Claude receives instructions to read these files in its system prompt
+- Edit context files directly in the `.claude/context/` directory
+
+Example:
+1. "Save this as project webapp"
+2. When prompted, provide files: `README.md`, `api-docs.txt`, `task-list.md`
+3. Files are copied to `~/.claude/context/webapp/`
+4. When you start the project, each terminal receives references to its context files
 
 ## Example
 

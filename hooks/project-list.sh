@@ -3,6 +3,7 @@
 # Usage: project-list.sh [--json]
 
 PROJECTS_DIR="$HOME/.claude/projects"
+CONTEXT_DIR="$HOME/.claude/context"
 
 # Check if projects directory exists
 if [[ ! -d "$PROJECTS_DIR" ]]; then
@@ -63,9 +64,31 @@ for project_file in "${PROJECT_FILES[@]}"; do
   # Get terminal names
   terminal_names=$(jq -r '.terminals[].name' "$project_file" | tr '\n' ', ' | sed 's/,$//')
 
+  # Check for context files
+  project_context_dir="$CONTEXT_DIR/$name"
+  context_file_count=0
+  context_file_list=""
+
+  if [[ -d "$project_context_dir" ]]; then
+    # Count .md files in context directory
+    context_file_count=$(find "$project_context_dir" -maxdepth 1 -name "*.md" -type f 2>/dev/null | wc -l)
+
+    # Get list of context files
+    if [[ $context_file_count -gt 0 ]]; then
+      context_file_list=$(find "$project_context_dir" -maxdepth 1 -name "*.md" -type f -exec basename {} \; 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
+    fi
+  fi
+
   echo "  • $name"
   echo "    Description: $description"
   echo "    Terminals: $terminal_count ($terminal_names)"
+
+  if [[ $context_file_count -gt 0 ]]; then
+    echo "    Context files: $context_file_count ($context_file_list)"
+  else
+    echo "    Context files: None"
+  fi
+
   echo ""
 done
 

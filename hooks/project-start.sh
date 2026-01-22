@@ -3,6 +3,7 @@
 # Usage: project-start.sh <project-name>
 
 PROJECTS_DIR="$HOME/.claude/projects"
+CONTEXT_DIR="$HOME/.claude/context"
 
 # Check arguments
 if [[ -z "$1" ]]; then
@@ -114,14 +115,28 @@ spawn_project_terminal() {
 
   local setup_script="/tmp/claude-project-${PROJECT_NAME}-${term_name}-$$.sh"
 
-  # Build initial prompt with context files
+  # Build initial prompt with context files from Claude directory
   local initial_prompt=""
-  if [[ -n "$context_files" ]]; then
-    initial_prompt="I'm working on the $PROJECT_NAME project. Here's the relevant context:\n\n"
-    while IFS= read -r file; do
-      initial_prompt+="$file\n"
+  local project_context_dir="$CONTEXT_DIR/$PROJECT_NAME"
+
+  if [[ -n "$context_files" ]] && [[ -d "$project_context_dir" ]]; then
+    initial_prompt="I'm working on the $PROJECT_NAME project.\n\n"
+    initial_prompt+="=== PROJECT CONTEXT ===\n\n"
+
+    # Read each context file and include its contents
+    while IFS= read -r context_file; do
+      local context_file_path="$project_context_dir/$context_file"
+
+      if [[ -f "$context_file_path" ]]; then
+        initial_prompt+="--- Context from: $context_file ---\n"
+        initial_prompt+="$(cat "$context_file_path")\n\n"
+      else
+        initial_prompt+="⚠ Context file not found: $context_file\n\n"
+      fi
     done <<< "$context_files"
-    initial_prompt+="\nReady to work!"
+
+    initial_prompt+="=== END CONTEXT ===\n\n"
+    initial_prompt+="Ready to work on $PROJECT_NAME!"
   fi
 
   # Create setup script
@@ -152,14 +167,61 @@ echo "Communication: ENABLED"
 echo ""
 EOF
 
-  # Add system prompt argument if provided
+  # Add system prompt and initial context handling
   if [[ -n "$system_prompt" ]]; then
     cat >> "$setup_script" <<EOF
 echo "Custom instructions: $system_prompt"
 echo ""
+EOF
+  fi
 
-# Start Claude with system prompt and initial context
-exec claude --append-system-prompt "$system_prompt"
+  # Show context files if any
+  if [[ -n "$context_files" ]]; then
+    cat >> "$setup_script" <<EOF
+echo "Context files loaded:"
+EOF
+    while IFS= read -r context_file; do
+      cat >> "$setup_script" <<EOF
+echo "  • $context_file"
+EOF
+    done <<< "$context_files"
+    cat >> "$setup_script" <<EOF
+echo ""
+EOF
+  fi
+
+  # Build enhanced system prompt with context file references
+  local enhanced_system_prompt="$system_prompt"
+
+  if [[ -n "$context_files" ]] && [[ -d "$project_context_dir" ]]; then
+    local context_references=""
+    context_references+="\n\n=== PROJECT CONTEXT FILES ===\n"
+    context_references+="This terminal has access to project context files stored in: $project_context_dir/\n\n"
+    context_references+="Available context files:\n"
+
+    while IFS= read -r context_file; do
+      local context_file_path="$project_context_dir/$context_file"
+      if [[ -f "$context_file_path" ]]; then
+        context_references+="- $context_file_path\n"
+      fi
+    done <<< "$context_files"
+
+    context_references+="\nPlease read these context files at the start of the session to understand the project requirements and current state."
+
+    if [[ -n "$enhanced_system_prompt" ]]; then
+      enhanced_system_prompt+="$context_references"
+    else
+      enhanced_system_prompt="$context_references"
+    fi
+  fi
+
+  # Start Claude with enhanced system prompt if we have one
+  if [[ -n "$enhanced_system_prompt" ]]; then
+    # Escape special characters for the command line
+    local escaped_prompt=$(printf '%s' "$enhanced_system_prompt" | sed 's/"/\\"/g')
+    cat >> "$setup_script" <<EOF
+# Start Claude with enhanced system prompt
+exec claude --append-system-prompt "$escaped_prompt"
 EOF
   else
     cat >> "$setup_script" <<EOF
