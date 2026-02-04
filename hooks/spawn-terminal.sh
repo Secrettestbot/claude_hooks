@@ -84,6 +84,34 @@ spawn_single() {
   local term_name="$1"
   local setup_script="/tmp/claude-spawn-${term_name}-$$.sh"
 
+  # Derive project identifier and ensure per-terminal CLAUDE.md exists
+  local spawn_project_id="${CLAUDE_PROJECT_ID:-}"
+  if [[ -z "$spawn_project_id" ]]; then
+    local spawn_git_root=$(git -C "$WORK_DIR" rev-parse --show-toplevel 2>/dev/null)
+    if [[ -n "$spawn_git_root" ]]; then
+      spawn_project_id=$(basename "$spawn_git_root")
+    else
+      spawn_project_id=$(basename "$WORK_DIR")
+    fi
+  fi
+  local spawn_context_dir="$HOME/.claude/context/$spawn_project_id"
+  mkdir -p "$spawn_context_dir"
+  local spawn_claudemd="$spawn_context_dir/${term_name}.md"
+  if [[ ! -f "$spawn_claudemd" ]]; then
+    cat > "$spawn_claudemd" <<SKEL
+# Terminal: ${term_name} | Project: ${spawn_project_id}
+
+Files created or modified by this terminal. Update the "Purpose" column to describe each file's role in the project.
+
+<!-- FILE_REGISTRY_START -->
+## File Registry
+
+| File Path | Purpose | Last Modified |
+|-----------|---------|---------------|
+<!-- FILE_REGISTRY_END -->
+SKEL
+  fi
+
   # Create a setup script that will run in the new terminal
   cat > "$setup_script" <<EOF
 #!/bin/bash
@@ -92,8 +120,9 @@ spawn_single() {
 # Change to the correct working directory
 cd "$WORK_DIR" || exit 1
 
-# Set terminal name for auto-registration
+# Set terminal name and project identifier
 export CLAUDE_TERMINAL_NAME="$term_name"
+export CLAUDE_PROJECT_ID="$spawn_project_id"
 
 # Enable communication - use source to export variables to current shell
 source "$HOME/.claude/hooks/terminal-comm-enable.sh" "$term_name"
@@ -148,9 +177,15 @@ else
   echo '{}' | jq --arg tty "\$MY_TTY" --arg name "$term_name" '.[\$tty] = \$name' > "\$TTY_MAP_FILE"
 fi
 
-# Start Claude Code directly
-# The auto-accept-trust.sh script running in background will handle the trust dialog
-exec claude
+# Load per-terminal file registry and start Claude
+_REGISTRY_FILE="\$HOME/.claude/context/\$CLAUDE_PROJECT_ID/\$CLAUDE_TERMINAL_NAME.md"
+if [[ -f "\$_REGISTRY_FILE" ]]; then
+  _REGISTRY=\$(cat "\$_REGISTRY_FILE")
+  exec claude --append-system-prompt "--- Your File Registry (\$CLAUDE_TERMINAL_NAME) ---
+\$_REGISTRY"
+else
+  exec claude
+fi
 
 # Clean up the setup script after use
 rm -f "$setup_script"

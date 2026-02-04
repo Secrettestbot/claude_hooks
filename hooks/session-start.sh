@@ -36,6 +36,18 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
   echo ""
 fi
 
+# ===== DERIVE PROJECT IDENTIFIER =====
+# Used by file tracking to locate this terminal's CLAUDE.md.
+# Set once; child processes (hooks) inherit it.
+if [[ -z "$CLAUDE_PROJECT_ID" ]]; then
+  _SS_GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [[ -n "$_SS_GIT_ROOT" ]]; then
+    export CLAUDE_PROJECT_ID=$(basename "$_SS_GIT_ROOT")
+  else
+    export CLAUDE_PROJECT_ID=$(basename "$(pwd)")
+  fi
+fi
+
 # ===== TOOL AVAILABILITY CHECK =====
 echo "🔧 Development Tools:"
 
@@ -182,11 +194,41 @@ if [[ -f "$HOME/.claude/hooks/terminal-comm-lib.sh" ]]; then
   fi
 fi
 
+# ===== FILE REGISTRY =====
+# Display this terminal's tracked-file registry (from its per-terminal CLAUDE.md).
+_SS_TERM_NAME="${CLAUDE_TERMINAL_NAME:-main}"
+_SS_REGISTRY_FILE="$HOME/.claude/context/${CLAUDE_PROJECT_ID}/${_SS_TERM_NAME}.md"
+
+if [[ -f "$_SS_REGISTRY_FILE" ]] && grep -q "FILE_REGISTRY_START" "$_SS_REGISTRY_FILE"; then
+  _SS_REGISTRY_CONTENT=$(sed -n '/<!-- FILE_REGISTRY_START -->/,/<!-- FILE_REGISTRY_END -->/p' "$_SS_REGISTRY_FILE")
+  # Data rows: lines starting with | but not the header ("File Path") or separator ("---")
+  _SS_DATA_ROWS=$(echo "$_SS_REGISTRY_CONTENT" | grep "^|" | grep -v "File Path" | grep -v "\-\-\-")
+
+  if [[ -n "$_SS_DATA_ROWS" ]]; then
+    _SS_ROW_COUNT=$(echo "$_SS_DATA_ROWS" | wc -l | tr -d ' ')
+    _SS_PENDING=$(echo "$_SS_DATA_ROWS" | grep -c "pending" || true)
+
+    echo "📋 File Registry ($_SS_ROW_COUNT tracked, $_SS_PENDING pending):"
+    echo "$_SS_DATA_ROWS" | while IFS= read -r _row; do
+      _FILE=$(echo "$_row" | awk -F'|' '{print $2}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      _PURP=$(echo "$_row" | awk -F'|' '{print $3}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if [[ "$_PURP" == *"pending"* ]]; then
+        echo "     $_FILE — $_PURP  ←"
+      else
+        echo "     $_FILE — $_PURP"
+      fi
+    done
+    echo ""
+  fi
+fi
+
 # ===== HELPFUL TIPS =====
 echo "💡 Tips:"
 echo "   • To use syntax-only mode: export CLAUDE_HOOK_MODE=\"syntax-only\""
 echo "   • To disable hooks: Remove PostToolUse from ~/.claude/settings.json"
 echo "   • View hook logs: Run Claude with verbose mode"
+echo "   • File tracking: Writes/Edits auto-recorded in your CLAUDE.md"
+echo "     Set purposes: bash ~/.claude/hooks/track-file.sh <path> \"<purpose>\""
 echo ""
 
 # Exit successfully (don't block session start)

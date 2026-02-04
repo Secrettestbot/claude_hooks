@@ -115,28 +115,50 @@ spawn_project_terminal() {
 
   local setup_script="/tmp/claude-project-${PROJECT_NAME}-${term_name}-$$.sh"
 
-  # Build initial prompt with context files from Claude directory
+  # Build initial prompt: project context files + per-terminal file registry
   local initial_prompt=""
   local project_context_dir="$CONTEXT_DIR/$PROJECT_NAME"
 
+  # Ensure context directory exists and auto-create this terminal's CLAUDE.md
+  mkdir -p "$project_context_dir"
+  local terminal_claudemd="$project_context_dir/${term_name}.md"
+  if [[ ! -f "$terminal_claudemd" ]]; then
+    cat > "$terminal_claudemd" <<SKEL
+# Terminal: ${term_name} | Project: ${PROJECT_NAME}
+
+Files created or modified by this terminal. Update the "Purpose" column to describe each file's role in the project.
+
+<!-- FILE_REGISTRY_START -->
+## File Registry
+
+| File Path | Purpose | Last Modified |
+|-----------|---------|---------------|
+<!-- FILE_REGISTRY_END -->
+SKEL
+  fi
+
+  # Load project context files (if any)
   if [[ -n "$context_files" ]] && [[ -d "$project_context_dir" ]]; then
-    initial_prompt="I'm working on the $PROJECT_NAME project.\n\n"
     initial_prompt+="=== PROJECT CONTEXT ===\n\n"
 
-    # Read each context file and include its contents
     while IFS= read -r context_file; do
+      # Strip leading @ for backward compatibility with older project files
+      context_file="${context_file#@}"
       local context_file_path="$project_context_dir/$context_file"
 
       if [[ -f "$context_file_path" ]]; then
-        initial_prompt+="--- Context from: $context_file ---\n"
+        initial_prompt+="--- Context: $context_file ---\n"
         initial_prompt+="$(cat "$context_file_path")\n\n"
-      else
-        initial_prompt+="⚠ Context file not found: $context_file\n\n"
       fi
     done <<< "$context_files"
 
     initial_prompt+="=== END CONTEXT ===\n\n"
-    initial_prompt+="Ready to work on $PROJECT_NAME!"
+  fi
+
+  # Always load this terminal's file registry (persists across sessions)
+  if [[ -f "$terminal_claudemd" ]]; then
+    initial_prompt+="--- Your File Registry (${term_name}.md) ---\n"
+    initial_prompt+="$(cat "$terminal_claudemd")\n"
   fi
 
   # Create setup script
@@ -147,8 +169,9 @@ spawn_project_terminal() {
 # Change to working directory
 cd "$workdir" || exit 1
 
-# Set terminal name
+# Set terminal name and project identifier
 export CLAUDE_TERMINAL_NAME="$term_name"
+export CLAUDE_PROJECT_ID="$PROJECT_NAME"
 
 # Enable communication
 bash "$HOME/.claude/hooks/terminal-comm-enable.sh" "$term_name" 2>/dev/null
@@ -190,28 +213,14 @@ echo ""
 EOF
   fi
 
-  # Build enhanced system prompt with context file references
+  # Build enhanced system prompt: role instructions + actual context content
   local enhanced_system_prompt="$system_prompt"
 
-  if [[ -n "$context_files" ]] && [[ -d "$project_context_dir" ]]; then
-    local context_references=""
-    context_references+="\n\n=== PROJECT CONTEXT FILES ===\n"
-    context_references+="This terminal has access to project context files stored in: $project_context_dir/\n\n"
-    context_references+="Available context files:\n"
-
-    while IFS= read -r context_file; do
-      local context_file_path="$project_context_dir/$context_file"
-      if [[ -f "$context_file_path" ]]; then
-        context_references+="- $context_file_path\n"
-      fi
-    done <<< "$context_files"
-
-    context_references+="\nPlease read these context files at the start of the session to understand the project requirements and current state."
-
+  if [[ -n "$initial_prompt" ]]; then
     if [[ -n "$enhanced_system_prompt" ]]; then
-      enhanced_system_prompt+="$context_references"
+      enhanced_system_prompt+="$initial_prompt"
     else
-      enhanced_system_prompt="$context_references"
+      enhanced_system_prompt="$initial_prompt"
     fi
   fi
 

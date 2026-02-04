@@ -15,6 +15,19 @@ if [[ -z "$FILE_PATH" ]] || [[ ! -f "$FILE_PATH" ]]; then
   exit 0
 fi
 
+# ===== FILE TRACKING =====
+# Auto-track this file in the terminal's CLAUDE.md registry.
+# Runs for ALL file types before the extension-specific validation below.
+# Skip any .md file that contains our registry markers (i.e. our own CLAUDE.md).
+if [[ "$(basename "$FILE_PATH")" != "CLAUDE.md" ]] && [[ -f "$HOME/.claude/hooks/track-file.sh" ]]; then
+  TRACK_RESULT=$(bash "$HOME/.claude/hooks/track-file.sh" "$FILE_PATH" 2>/dev/null)
+  if [[ "$TRACK_RESULT" == "new" ]]; then
+    echo "📄 Tracked (new): $FILE_PATH — set purpose with: track-file.sh \"$FILE_PATH\" \"<purpose>\""
+  elif [[ "$TRACK_RESULT" == "updated" ]]; then
+    echo "📄 Tracked: $FILE_PATH"
+  fi
+fi
+
 # Determine file type
 EXTENSION="${FILE_PATH##*.}"
 ERRORS_FOUND=false
