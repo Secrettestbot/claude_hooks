@@ -1,40 +1,22 @@
 {
   "terminals": [
     {
-      "session_id": "59759",
-      "name": "T1",
-      "pid": "59760",
-      "registered_at": "2026-01-20T19:32:15Z"
-    },
-    {
-      "session_id": "59827",
-      "name": "T2",
-      "pid": "59828",
-      "registered_at": "2026-01-20T19:32:16Z"
-    },
-    {
-      "session_id": "32450",
+      "session_id": "618506",
       "name": "Overlord",
-      "pid": "73892",
-      "registered_at": "2026-01-20T19:35:51Z"
+      "pid": "618507",
+      "registered_at": "2026-02-05T00:16:48Z"
     },
     {
-      "session_id": "347287",
-      "name": "T4",
-      "pid": "347288",
-      "registered_at": "2026-01-20T20:48:25Z"
+      "session_id": "618570",
+      "name": "T1",
+      "pid": "618572",
+      "registered_at": "2026-02-05T00:16:49Z"
     },
     {
-      "session_id": "347367",
-      "name": "T3",
-      "pid": "347368",
-      "registered_at": "2026-01-20T20:48:25Z"
-    },
-    {
-      "session_id": "347445",
-      "name": "Tester",
-      "pid": "347448",
-      "registered_at": "2026-01-20T20:48:26Z"
+      "session_id": "618630",
+      "name": "T2",
+      "pid": "618639",
+      "registered_at": "2026-02-05T00:16:49Z"
     }
   ]
 }
